@@ -9,4 +9,5 @@ RUN pip install -r /app/requirements.txt
 RUN pip install tensorflow-io
 RUN pip uninstall -y tensorflow-io
 ENV PYTHONPATH="${PYTHONPATH}:/app"
+COPY . /app
 CMD ["python", "/app/gui_app.py"]
