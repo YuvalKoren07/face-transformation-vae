@@ -273,10 +273,10 @@ with gr.Blocks(css=CSS, js=JS, title="Face Attribute Editor") as demo:
             <h1 style="color:#ffffff; margin:0; font-size:2.2rem; font-weight:700;">
                 🎨 Face Attribute Editor
             </h1>
-            <p style="color:#a0a0c0; margin-top:8px; font-size:1.05rem;">
+            <p style="color:#a0a0c0; margin-top:8px; font-size:1.25rem;">
                 Variational Autoencoder &middot; Latent-space attribute manipulation
             </p>
-            <p style="margin-top:8px; font-size:0.95rem;">
+            <p style="margin-top:8px; font-size:1.1rem;">
                 <a href="{GITHUB_APP}" target="_blank"
                    style="color:#a78bfa; text-decoration:none;">
                     📂 View source on GitHub
@@ -310,18 +310,11 @@ with gr.Blocks(css=CSS, js=JS, title="Face Attribute Editor") as demo:
         # ── RIGHT COLUMN ─────────────────────────────────────────
         with gr.Column(scale=3):
 
-            gr.HTML("""
-                <p style="color:#a78bfa; font-size:1rem; font-weight:600;
-                           text-align:center; margin:0 0 10px 0;">
-                    ⚠️ 32×32 — downscaled, not upscaled
-                </p>
-            """)
-
             with gr.Row(equal_height=True):
                 with gr.Column():
-                    gr.HTML(f'<p style="{SECTION_TITLE}">🔽 Downscaled</p>')
+                    gr.HTML(f'<p style="{SECTION_TITLE}">🔽 32×32 Downscaled</p>')
                     input_display = gr.Image(
-                        label="Downscaled",
+                        label="32x32 Downscaled",
                         height=DISPLAY_IMAGE_SIZE,
                         interactive=False
                     )
@@ -349,9 +342,11 @@ with gr.Blocks(css=CSS, js=JS, title="Face Attribute Editor") as demo:
                     <p style="color:#ffffff; font-size:1.15rem; line-height:2.4; margin:0;">
                         <b style="color:#c4affe;">0. Train</b> &mdash;
                             I defined and trained a Variational Autoencoder on the
-                            <a href="{GITHUB_APP}" target="_blank"
+                            <a href="http://mmlab.ie.cuhk.edu.hk/projects/CelebA.html" target="_blank"
                                style="color:#a78bfa;">CelebA faces dataset</a>
-                            (200k images).<br>
+                            (200k images) &mdash;
+                            <a href="https://github.com/YuvalKoren07/face-transformation-vae/blob/main/Vae_Training_final.ipynb" target="_blank"
+                               style="color:#a78bfa;">view training notebook</a>.<br>
                         <b style="color:#c4affe;">1. Encode</b> &mdash;
                             Your photo is resized to 32&times;32 and mapped to a
                             400-D point in the VAE latent space.<br>
