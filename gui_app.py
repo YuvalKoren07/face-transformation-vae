@@ -1,5 +1,7 @@
 import os
 import pickle
+import random
+import glob
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -9,15 +11,14 @@ import gradio as gr
 DISPLAY_IMAGE_SIZE = 256
 IMAGE_SIZE   = 32
 BATCH_SIZE   = 256
-#MODEL_DIR    = "/app/notebooks/03_vae/03_vae_faces/model_final2_IMAGE_SIZE_32__CHANNELS_3__KERNEL_SIZE_3__BATCH_SIZE_256__NUM_FEATURES_512__Z_DIM_400__LR_0.0005__EPOCHS_40__BETA_20000"
 MODEL_DIR    = "/app/models"
 DATA_DIR     = "/app/data/celeba-dataset"
 ATTR_CSV     = f"{DATA_DIR}/list_attr_celeba.csv"
 IMG_DIR      = f"{DATA_DIR}/img_align_celeba/img_align_celeba"
 VECTOR_CACHE = "/app/attribute_vectors.pkl"
+SAMPLE_FACES_DIR = "/app/sample_faces"
 
-# remove the cache for new models!!!!!!!!!!!!!!!
-#os.remove(VECTOR_CACHE)
+GITHUB_APP = "https://github.com/YuvalKoren07/face-transformation-vae"
 
 ATTRIBUTES = [
     "Eyeglasses", "Smiling", "Young", "Bald", "Pale_Skin",
@@ -73,35 +74,7 @@ available_attrs   = [a for a in ATTRIBUTES if a in attribute_vectors]
 N                 = len(available_attrs)
 INIT_CSV          = ",".join(["0.0"] * N)
 
-
-# Cache the encoded z_mean so we don't re-encode on every slider move
 _cached_z_mean = None
-
-
-def apply_sliders(slider_csv):
-    global _cached_z_mean
-
-    if _cached_z_mean is None:
-        return None
-
-    values = [float(x) for x in slider_csv.split(",")]
-
-    new_z = _cached_z_mean.copy()
-
-    for attr, strength in zip(available_attrs, values):
-        new_z += strength * attribute_vectors[attr]
-
-    edited = decoder.predict(new_z, verbose=0)[0]
-    edited = (np.clip(edited, 0, 1) * 255).astype(np.uint8)
-
-    edited = np.array(
-        Image.fromarray(edited).resize((DISPLAY_IMAGE_SIZE, DISPLAY_IMAGE_SIZE), Image.NEAREST)
-    )
-
-    return edited
-
-def reset_sliders():
-    return INIT_CSV
 
 
 def process_and_encode(image):
@@ -112,31 +85,53 @@ def process_and_encode(image):
         return None, None, None
 
     pil_img = Image.fromarray(image).convert("RGB")
-
-    # ORIGINAL (resized nicely)
-    original_disp = pil_img.resize((DISPLAY_IMAGE_SIZE, DISPLAY_IMAGE_SIZE), Image.NEAREST)
-
-    # 32x32
-    small = pil_img.resize((IMAGE_SIZE, IMAGE_SIZE), Image.LANCZOS)
-
-    # Upscaled
+    small   = pil_img.resize((IMAGE_SIZE, IMAGE_SIZE), Image.LANCZOS)
     display = small.resize((DISPLAY_IMAGE_SIZE, DISPLAY_IMAGE_SIZE), Image.NEAREST)
 
-    # Encode
     img_array = np.expand_dims(np.array(small, dtype="float32") / 255.0, axis=0)
     z_mean, _, _ = encoder.predict(img_array, verbose=0)
     _cached_z_mean = z_mean
 
-    # Reconstruction
     recon = (np.clip(decoder.predict(z_mean, verbose=0)[0], 0, 1) * 255).astype(np.uint8)
     recon = np.array(
         Image.fromarray(recon).resize((DISPLAY_IMAGE_SIZE, DISPLAY_IMAGE_SIZE), Image.NEAREST)
     )
 
-    # EDITED VERSION
-
-
     return np.array(display), recon, recon
+
+
+def load_random_face():
+    sample_files = (
+        glob.glob(os.path.join(SAMPLE_FACES_DIR, "*.jpg"))
+        + glob.glob(os.path.join(SAMPLE_FACES_DIR, "*.jpeg"))
+        + glob.glob(os.path.join(SAMPLE_FACES_DIR, "*.png"))
+    )
+    if not sample_files:
+        return None, None, None, None
+    chosen = random.choice(sample_files)
+    img = np.array(Image.open(chosen).convert("RGB"))
+    display, recon, edited = process_and_encode(img)
+    return img, display, recon, edited
+
+
+def apply_sliders(slider_csv):
+    global _cached_z_mean
+    if _cached_z_mean is None:
+        return None
+    values = [float(x) for x in slider_csv.split(",")]
+    new_z  = _cached_z_mean.copy()
+    for attr, strength in zip(available_attrs, values):
+        new_z += strength * attribute_vectors[attr]
+    edited = decoder.predict(new_z, verbose=0)[0]
+    edited = (np.clip(edited, 0, 1) * 255).astype(np.uint8)
+    return np.array(
+        Image.fromarray(edited).resize((DISPLAY_IMAGE_SIZE, DISPLAY_IMAGE_SIZE), Image.NEAREST)
+    )
+
+
+def reset_sliders():
+    return INIT_CSV
+
 
 def build_slider_html(attrs, labels):
     items = ""
@@ -144,8 +139,8 @@ def build_slider_html(attrs, labels):
         items += f"""
         <div style="padding:10px 6px; border-bottom:1px solid #2a2a3a;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
-                <span style="color:#ffffff; font-size:.92rem;">{labels[attr]}</span>
-                <span id="fae-lbl-{i}" style="color:#a78bfa; font-size:.88rem; min-width:34px; text-align:right;">0.0</span>
+                <span style="color:#ffffff; font-size:1rem;">{labels[attr]}</span>
+                <span id="fae-lbl-{i}" style="color:#a78bfa; font-size:.95rem; min-width:34px; text-align:right;">0.0</span>
             </div>
             <input type="range" min="-3" max="3" value="0" step="1"
                    data-idx="{i}"
@@ -168,9 +163,6 @@ def build_slider_html(attrs, labels):
     ">{items}</div>"""
 
 
-# JavaScript injected via gr.Blocks(js=...) — this is the ONLY way to run
-# JS in Gradio that bypasses HTML sanitization. gr.HTML strips script tags
-# and inline handlers; gr.Blocks(js=) does not.
 JS = f"""
 () => {{
     var FAE_N = {N};
@@ -201,7 +193,6 @@ JS = f"""
         var box = document.getElementById('fae-slider-box');
         if (!box) {{ setTimeout(faeAttachSliders, 400); return; }}
 
-        // Event delegation: one listener on the container catches all sliders
         box.addEventListener('input', function(e) {{
             if (e.target.type !== 'range') return;
             var idx = parseInt(e.target.getAttribute('data-idx'));
@@ -212,7 +203,6 @@ JS = f"""
             faeSendToGradio(faeValues.join(','));
         }});
 
-        // Poll for Python-side resets (reset button updates textbox from Python)
         setInterval(function() {{
             var tb = faeGetTextbox();
             if (!tb || tb.value === faePrevCSV) return;
@@ -234,7 +224,7 @@ JS = f"""
 """
 
 SECTION_TITLE = (
-    "color:#a78bfa; font-size:.8rem; font-weight:700; letter-spacing:.12em; "
+    "color:#a78bfa; font-size:1rem; font-weight:700; letter-spacing:.1em; "
     "text-transform:uppercase; border-bottom:1px solid #2a2a3a; "
     "padding-bottom:6px; margin-bottom:12px;"
 )
@@ -258,6 +248,11 @@ body, .gradio-container, .gradio-container > .main, .gradio-container > .main > 
     color: #ffffff !important; border-radius: 10px !important;
     margin-top: 10px !important;
 }
+.random-btn {
+    background: #1e2e1e !important; border: 1px solid #3a553a !important;
+    color: #ffffff !important; border-radius: 10px !important;
+    margin-top: 6px !important;
+}
 #fae-hidden-box {
     position: absolute !important;
     top: -9999px !important;
@@ -273,13 +268,19 @@ footer { display: none !important; }
 
 with gr.Blocks(css=CSS, js=JS, title="Face Attribute Editor") as demo:
 
-    gr.HTML("""
+    gr.HTML(f"""
         <div style="text-align:center; padding:24px 0 16px;">
             <h1 style="color:#ffffff; margin:0; font-size:2.2rem; font-weight:700;">
                 🎨 Face Attribute Editor
             </h1>
-            <p style="color:#a0a0c0; margin-top:8px; font-size:1rem;">
+            <p style="color:#a0a0c0; margin-top:8px; font-size:1.05rem;">
                 Variational Autoencoder &middot; Latent-space attribute manipulation
+            </p>
+            <p style="margin-top:8px; font-size:0.95rem;">
+                <a href="{GITHUB_APP}" target="_blank"
+                   style="color:#a78bfa; text-decoration:none;">
+                    📂 View source on GitHub
+                </a>
             </p>
         </div>
     """)
@@ -288,53 +289,47 @@ with gr.Blocks(css=CSS, js=JS, title="Face Attribute Editor") as demo:
 
     with gr.Row(equal_height=False):
 
-        # LEFT SIDE (controls)
-
+        # ── LEFT COLUMN ──────────────────────────────────────────
         with gr.Column(scale=1, elem_classes="left-card"):
-            gr.HTML(f'<p style="{SECTION_TITLE}">📁 Upload Photo</p>')
 
-            input_image = gr.Image(label="Upload a face photo", type="numpy")
-            
-            #input_display = gr.Image(label="Upload a face photo", height=DISPLAY_IMAGE_SIZE)
-
-            # input_image = gr.Image(label="Upload a face photo", type="numpy", visible=False)
-            # input_display = gr.Image(label="Upload a face photo", height=DISPLAY_IMAGE_SIZE, interactive=False)
-            #
+            gr.HTML(f'<p style="{SECTION_TITLE}">🎚 Attributes</p>')
             gr.HTML(f"""
-                <p style="{SECTION_TITLE} margin-top:18px;">🎚 Attributes</p>
-                <p style="color:#cccccc; font-size:.88rem; margin:0 0 10px 0;">
-                    Drag the scrollbar on the right to see all. Negative values reverse an attribute.
+                <p style="color:#cccccc; font-size:1rem; margin:0 0 10px 0;">
+                    Drag the scrollbar on the right to see all.
+                    Negative values reverse an attribute.
+                </p>
+            """)
+            gr.HTML(build_slider_html(available_attrs, ATTR_LABELS))
+
+            reset_btn  = gr.Button("↺ Reset All Sliders", elem_classes="reset-btn")
+
+            gr.HTML(f'<p style="{SECTION_TITLE} margin-top:20px;">📁 Upload Photo</p>')
+            input_image = gr.Image(label="Upload a face photo", type="numpy")
+            random_btn  = gr.Button("🎲 Random Face", elem_classes="random-btn")
+
+        # ── RIGHT COLUMN ─────────────────────────────────────────
+        with gr.Column(scale=3):
+
+            gr.HTML("""
+                <p style="color:#a78bfa; font-size:1rem; font-weight:600;
+                           text-align:center; margin:0 0 10px 0;">
+                    ⚠️ 32×32 — downscaled, not upscaled
                 </p>
             """)
 
-            gr.HTML(build_slider_html(available_attrs, ATTR_LABELS))
-
-            reset_btn = gr.Button("↺ Reset All Sliders", elem_classes="reset-btn")
-
-            # RIGHT SIDE (ALL outputs)
-        with gr.Column(scale=3):
             with gr.Row(equal_height=True):
-                # with gr.Column():
-                #     gr.HTML(f'<p style="{SECTION_TITLE}">🖼 Original</p>')
-                #     original_input_view = gr.Image(
-                #         label="Original",
-                #         type="numpy",
-                #         height=DISPLAY_IMAGE_SIZE,
-                #         interactive=False
-                #     )
-
                 with gr.Column():
-                    gr.HTML(f'<p style="{SECTION_TITLE}">🔽 32×32 → Upscaled</p>')
+                    gr.HTML(f'<p style="{SECTION_TITLE}">🔽 Downscaled</p>')
                     input_display = gr.Image(
-                        label="Downscaled + Upscaled",
+                        label="Downscaled",
                         height=DISPLAY_IMAGE_SIZE,
                         interactive=False
                     )
 
                 with gr.Column():
-                    gr.HTML(f'<p style="{SECTION_TITLE}">🔍 Reconstruction</p>')
+                    gr.HTML(f'<p style="{SECTION_TITLE}">🔍 Decoded / Reconstructed</p>')
                     original_out = gr.Image(
-                        label="No edits",
+                        label="Decoded / Reconstructed",
                         height=DISPLAY_IMAGE_SIZE,
                         interactive=False
                     )
@@ -351,35 +346,51 @@ with gr.Blocks(css=CSS, js=JS, title="Face Attribute Editor") as demo:
                 <p style="{SECTION_TITLE} margin-top:20px;">ℹ️ How it works</p>
                 <div style="background:#1a1a28; border-left:4px solid #a78bfa;
                             border-radius:8px; padding:22px 24px; margin-bottom:20px;">
-                    <p style="color:#ffffff; font-size:1.05rem; line-height:2.4; margin:0;">
+                    <p style="color:#ffffff; font-size:1.15rem; line-height:2.4; margin:0;">
+                        <b style="color:#c4affe;">0. Train</b> &mdash;
+                            I defined and trained a Variational Autoencoder on the
+                            <a href="{GITHUB_APP}" target="_blank"
+                               style="color:#a78bfa;">CelebA faces dataset</a>
+                            (200k images).<br>
                         <b style="color:#c4affe;">1. Encode</b> &mdash;
-                            Your photo is resized to 32&times;32 and mapped to a 400-D point in the VAE latent space.<br>
+                            Your photo is resized to 32&times;32 and mapped to a
+                            400-D point in the VAE latent space.<br>
                         <b style="color:#c4affe;">2. Shift</b> &mdash;
-                            Each slider nudges that point toward or away from an attribute direction.<br>
+                            Each slider nudges that point toward or away from
+                            a learned attribute direction.<br>
                         <b style="color:#c4affe;">3. Decode</b> &mdash;
-                            The decoder renders the shifted latent point back into a face image.
+                            The decoder renders the shifted latent point back
+                            into a face image.
                     </p>
                 </div>
+
                 <p style="{SECTION_TITLE}">🗒 Tips</p>
                 <div style="background:#1a1a28; border-left:4px solid #6c63ff;
                             border-radius:8px; padding:22px 24px;">
-                    <p style="color:#ffffff; font-size:1.05rem; line-height:2.4; margin:0;">
-                        &#x2022; The <b style="color:#c4affe;">Original Reconstruction</b>
-                            shows how well the VAE encoded your photo.<br>
+                    <p style="color:#ffffff; font-size:1.15rem; line-height:2.4; margin:0;">
+                        &#x2022; The <b style="color:#c4affe;">Decoded / Reconstructed</b>
+                            image shows how well the VAE encoded your photo.<br>
                         &#x2022; Outputs look <b style="color:#c4affe;">somewhat blurry</b>
                             &mdash; the model was trained on 32&times;32 images.<br>
-                        &#x2022; Use <b style="color:#c4affe;">&plusmn;2&ndash;3</b> for dramatic changes,
-                            <b style="color:#c4affe;">&plusmn;0.5&ndash;1</b> for subtle ones.<br>
+                        &#x2022; Use <b style="color:#c4affe;">&plusmn;2&ndash;3</b> for
+                            dramatic changes,
+                            <b style="color:#c4affe;">&plusmn;1</b> for subtle ones.<br>
                         &#x2022; Combining multiple sliders gives the most realistic results.<br>
-                        &#x2022; Works best with well-lit, front-facing portrait photos.
+                        &#x2022; Works best with a well-lit, front-facing photo where
+                            <b style="color:#c4affe;">the face takes up ~50% of the image</b>.
                     </p>
                 </div>
             """)
 
+    # ── Event wiring ─────────────────────────────────────────────
     input_image.change(
         fn=process_and_encode,
         inputs=[input_image],
         outputs=[input_display, original_out, edited_out],
+    )
+    random_btn.click(
+        fn=load_random_face,
+        outputs=[input_image, input_display, original_out, edited_out],
     )
     slider_values_box.change(
         fn=apply_sliders,
