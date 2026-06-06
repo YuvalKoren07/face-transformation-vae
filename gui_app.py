@@ -339,7 +339,7 @@ with gr.Blocks(css=CSS, js=JS, title="Face Attribute Editor") as demo:
                 <p style="{SECTION_TITLE} margin-top:20px;">ℹ️ How it works &nbsp;
                     <a href="https://drive.google.com/file/d/1iRX2CGMg3FhtFA7YxV3DPZ5QS2nVc0lA/view?usp=sharing"
                        target="_blank"
-                       style="color:#a78bfa; font-size:0.95rem; font-weight:500;
+                       style="color:#a78bfa; font-size:1.1rem; font-weight:700;
                               text-transform:none; letter-spacing:0;">
                         🎬 Watch tutorial
                     </a>
