@@ -336,7 +336,14 @@ with gr.Blocks(css=CSS, js=JS, title="Face Attribute Editor") as demo:
                     )
 
             gr.HTML(f"""
-                <p style="{SECTION_TITLE} margin-top:20px;">ℹ️ How it works</p>
+                <p style="{SECTION_TITLE} margin-top:20px;">ℹ️ How it works &nbsp;
+                    <a href="https://drive.google.com/file/d/1iRX2CGMg3FhtFA7YxV3DPZ5QS2nVc0lA/view?usp=sharing"
+                       target="_blank"
+                       style="color:#a78bfa; font-size:0.95rem; font-weight:500;
+                              text-transform:none; letter-spacing:0;">
+                        🎬 Watch tutorial
+                    </a>
+                </p>
                 <div style="background:#1a1a28; border-left:4px solid #a78bfa;
                             border-radius:8px; padding:22px 24px; margin-bottom:20px;">
                     <p style="color:#ffffff; font-size:1.15rem; line-height:2.4; margin:0;">
