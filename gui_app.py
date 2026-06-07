@@ -82,7 +82,7 @@ def process_and_encode(image):
 
     if image is None:
         _cached_z_mean = None
-        return None, None, None
+        return None, None, None, INIT_CSV
 
     pil_img = Image.fromarray(image).convert("RGB")
     small   = pil_img.resize((IMAGE_SIZE, IMAGE_SIZE), Image.LANCZOS)
@@ -97,7 +97,7 @@ def process_and_encode(image):
         Image.fromarray(recon).resize((DISPLAY_IMAGE_SIZE, DISPLAY_IMAGE_SIZE), Image.NEAREST)
     )
 
-    return np.array(display), recon, recon
+    return np.array(display), recon, recon, INIT_CSV
 
 
 def load_random_face():
@@ -111,7 +111,7 @@ def load_random_face():
     chosen = random.choice(sample_files)
     img = np.array(Image.open(chosen).convert("RGB"))
     display, recon, edited = process_and_encode(img)
-    return img, display, recon, edited
+    return img, display, recon, edited, INIT_CSV
 
 
 def apply_sliders(slider_csv):
@@ -281,6 +281,12 @@ with gr.Blocks(css=CSS, js=JS, title="Face Attribute Editor") as demo:
                    style="color:#a78bfa; text-decoration:none;">
                     📂 View source on GitHub
                 </a>
+                &nbsp;&nbsp;·&nbsp;&nbsp;
+                <a href="https://drive.google.com/file/d/1iRX2CGMg3FhtFA7YxV3DPZ5QS2nVc0lA/view?usp=sharing"
+                   target="_blank"
+                   style="color:#a78bfa; text-decoration:none;">
+                    🎬 Watch tutorial
+                </a>
             </p>
         </div>
     """)
@@ -355,14 +361,15 @@ with gr.Blocks(css=CSS, js=JS, title="Face Attribute Editor") as demo:
                             <a href="https://github.com/YuvalKoren07/face-transformation-vae/blob/main/Vae_Training_final.ipynb" target="_blank"
                                style="color:#a78bfa;">view training notebook</a>.<br>
                         <b style="color:#c4affe;">1. Encode</b> &mdash;
-                            Your photo is resized to 32&times;32 and mapped to a
-                            400-D point in the VAE latent space.<br>
-                        <b style="color:#c4affe;">2. Shift</b> &mdash;
-                            Each slider nudges that point toward or away from
-                            a learned attribute direction.<br>
-                        <b style="color:#c4affe;">3. Decode</b> &mdash;
-                            The decoder renders the shifted latent point back
-                            into a face image.
+                            Your photo is resized to 32&times;32 (Image 1) and then
+                            encoded/mapped to a 400-D point in the VAE latent space.<br>
+                        <b style="color:#c4affe;">2. Decode</b> &mdash;
+                            The 400-D point is decoded/reconstructed back into a
+                            face image (Image 2).<br>
+                        <b style="color:#c4affe;">3. Edit</b> &mdash;
+                            Each slider nudges the 400-D encoded image toward or away
+                            from a learned attribute direction and the result is again
+                            decoded and rendered (Image 3).
                     </p>
                 </div>
 
@@ -388,11 +395,11 @@ with gr.Blocks(css=CSS, js=JS, title="Face Attribute Editor") as demo:
     input_image.change(
         fn=process_and_encode,
         inputs=[input_image],
-        outputs=[input_display, original_out, edited_out],
+        outputs=[input_display, original_out, edited_out, slider_values_box],
     )
     random_btn.click(
         fn=load_random_face,
-        outputs=[input_image, input_display, original_out, edited_out],
+        outputs=[input_image, input_display, original_out, edited_out, slider_values_box],
     )
     slider_values_box.change(
         fn=apply_sliders,
