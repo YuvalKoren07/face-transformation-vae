@@ -107,10 +107,10 @@ def load_random_face():
         + glob.glob(os.path.join(SAMPLE_FACES_DIR, "*.png"))
     )
     if not sample_files:
-        return None, None, None, None
+        return None, None, None, None, INIT_CSV
     chosen = random.choice(sample_files)
     img = np.array(Image.open(chosen).convert("RGB"))
-    display, recon, edited = process_and_encode(img)
+    display, recon, edited, _ = process_and_encode(img)
     return img, display, recon, edited, INIT_CSV
 
 
